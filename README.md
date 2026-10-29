@@ -9,7 +9,7 @@ A simple, fast, and responsive To-Do List web application built with **Node.js**
   - `POST /api/todos`: Create a new task
   - `PUT /api/todos/:id`: Update task completion status or edit task text
   - `DELETE /api/todos/:id`: Delete a task
-- **No Database Required**: Tasks are persistently stored in a local `todos.json` file.
+- **Persistent Storage**: Tasks are stored in AWS DynamoDB using the `TodoTable` table.
 - **Modern & Mobile-Friendly UI**:
   - Task status filters: All, Active, Completed
   - In-place task editing
@@ -23,7 +23,6 @@ A simple, fast, and responsive To-Do List web application built with **Node.js**
 ├── .gitignore
 ├── package.json
 ├── server.js
-├── todos.json
 ├── README.md
 └── public/
     └── index.html
@@ -49,11 +48,15 @@ A simple, fast, and responsive To-Do List web application built with **Node.js**
    npm install
    ```
 
-3. Start the server:
+3. Create a DynamoDB table named `TodoTable` with a String partition key named `id` and no sort key. The server uses the AWS default credential provider chain; on EC2, attach an IAM role with permission to scan, put, update, and delete items in this table.
+
+4. Optionally set `AWS_REGION` to your table's region. It defaults to `ap-south-1`.
+
+5. Start the server:
    ```bash
    npm start
    ```
 
-4. Open in your browser:
+6. Open in your browser:
    - Locally: `http://localhost:3000`
    - On a Cloud Server (e.g. AWS EC2): `http://<your-server-public-ip>:3000` (make sure port `3000` is open in your Security Group inbound rules).
