@@ -513,15 +513,21 @@
     // Toggle completed status
     async function toggleComplete(id, completed) {
       try {
+        const existing = todos.find(t => String(t.id) === String(id));
+        const payload = { completed };
+        if (existing && existing.done !== undefined) {
+          payload.done = completed;
+        }
+
         const response = await fetch(`/api/todos/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ completed })
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) throw new Error('Failed to update task');
         const updated = await response.json();
-        todos = todos.map(t => t.id === id ? updated : t);
+        todos = todos.map(t => String(t.id) === String(id) ? updated : t);
         render();
       } catch (err) {
         console.error(err);
@@ -539,7 +545,7 @@
         });
 
         if (!response.ok) throw new Error('Failed to delete task');
-        todos = todos.filter(t => t.id !== id);
+        todos = todos.filter(t => String(t.id) !== String(id));
         render();
         showToast('Task deleted');
       } catch (err) {
@@ -557,15 +563,21 @@
       }
 
       try {
+        const existing = todos.find(t => String(t.id) === String(id));
+        const payload = { text };
+        if (existing && existing.title !== undefined) {
+          payload.title = text;
+        }
+
         const response = await fetch(`/api/todos/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text })
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) throw new Error('Failed to update task');
         const updated = await response.json();
-        todos = todos.map(t => t.id === id ? updated : t);
+        todos = todos.map(t => String(t.id) === String(id) ? updated : t);
         render();
         showToast('Task updated');
       } catch (err) {
@@ -625,13 +637,13 @@
       // Filter todos
       let filtered = todos;
       if (currentFilter === 'active') {
-        filtered = todos.filter(t => !t.completed);
+        filtered = todos.filter(t => !(t.completed || t.done));
       } else if (currentFilter === 'completed') {
-        filtered = todos.filter(t => t.completed);
+        filtered = todos.filter(t => Boolean(t.completed || t.done));
       }
 
       // Update counters
-      const activeCount = todos.filter(t => !t.completed).length;
+      const activeCount = todos.filter(t => !(t.completed || t.done)).length;
       taskCount.textContent = `${activeCount} task${activeCount === 1 ? '' : 's'} remaining`;
 
       // Clear current list
@@ -657,19 +669,23 @@
 
       // Render items
       filtered.forEach(todo => {
+        const isDone = Boolean(todo.completed || todo.done);
+        const taskText = todo.text || todo.title || '';
+        const todoId = String(todo.id);
+
         const li = document.createElement('li');
-        li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
-        li.dataset.id = todo.id;
+        li.className = `todo-item ${isDone ? 'completed' : ''}`;
+        li.dataset.id = todoId;
 
         li.innerHTML = `
           <div class="todo-content">
             <input
               type="checkbox"
               class="checkbox"
-              ${todo.completed ? 'checked' : ''}
+              ${isDone ? 'checked' : ''}
               aria-label="Mark task as complete"
             />
-            <span class="todo-text">${escapeHtml(todo.text)}</span>
+            <span class="todo-text">${escapeHtml(taskText)}</span>
           </div>
           <div class="todo-actions">
             <button class="icon-btn edit-btn" title="Edit task" aria-label="Edit task">
@@ -690,19 +706,19 @@
         // Checkbox toggle
         const checkbox = li.querySelector('.checkbox');
         checkbox.addEventListener('change', () => {
-          toggleComplete(todo.id, checkbox.checked);
+          toggleComplete(todoId, checkbox.checked);
         });
 
         // Edit button
         const editBtn = li.querySelector('.edit-btn');
         editBtn.addEventListener('click', () => {
-          enterEditMode(todo.id, todo.text, li);
+          enterEditMode(todoId, taskText, li);
         });
 
         // Delete button
         const deleteBtn = li.querySelector('.delete-btn');
         deleteBtn.addEventListener('click', () => {
-          deleteTodo(todo.id);
+          deleteTodo(todoId);
         });
 
         todoList.appendChild(li);

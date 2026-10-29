@@ -24,6 +24,7 @@ function isConditionalCheckFailure(error) {
   return error.name === 'ConditionalCheckFailedException';
 }
 
+// 1. GET /api/todos - Retrieve all todos from DynamoDB
 app.get('/api/todos', async (req, res) => {
   try {
     const todos = [];
@@ -46,20 +47,30 @@ app.get('/api/todos', async (req, res) => {
   }
 });
 
+// 2. POST /api/todos - Create a new todo in DynamoDB
 app.post('/api/todos', async (req, res) => {
   try {
-    const { text } = req.body;
+    const textContent = req.body.text ?? req.body.title;
 
-    if (!text || typeof text !== 'string' || text.trim() === '') {
+    if (!textContent || typeof textContent !== 'string' || textContent.trim() === '') {
       return res.status(400).json({ error: 'Todo text is required' });
     }
 
+    const id = Date.now().toString();
     const newTodo = {
-      id: Date.now().toString(),
-      text: text.trim(),
+      id,
       completed: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...req.body,
+      id // Guarantee string id is preserved
     };
+
+    if (typeof req.body.text === 'string') {
+      newTodo.text = req.body.text.trim();
+    }
+    if (typeof req.body.title === 'string') {
+      newTodo.title = req.body.title.trim();
+    }
 
     await dynamoDB.send(new PutCommand({
       TableName: TABLE_NAME,
@@ -74,28 +85,36 @@ app.post('/api/todos', async (req, res) => {
   }
 });
 
+// 3. PUT /api/todos/:id - Update an existing todo in DynamoDB
 app.put('/api/todos/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, completed } = req.body;
+
+    if (req.body.text !== undefined) {
+      if (typeof req.body.text !== 'string' || req.body.text.trim() === '') {
+        return res.status(400).json({ error: 'Todo text cannot be empty' });
+      }
+    }
+    if (req.body.title !== undefined) {
+      if (typeof req.body.title !== 'string' || req.body.title.trim() === '') {
+        return res.status(400).json({ error: 'Todo title cannot be empty' });
+      }
+    }
+
     const expressionNames = { '#updatedAt': 'updatedAt' };
     const expressionValues = { ':updatedAt': new Date().toISOString() };
     const updates = ['#updatedAt = :updatedAt'];
 
-    if (typeof text === 'string') {
-      if (text.trim() === '') {
-        return res.status(400).json({ error: 'Todo text cannot be empty' });
-      }
-      expressionNames['#text'] = 'text';
-      expressionValues[':text'] = text.trim();
-      updates.push('#text = :text');
-    }
-
-    if (typeof completed === 'boolean') {
-      expressionNames['#completed'] = 'completed';
-      expressionValues[':completed'] = completed;
-      updates.push('#completed = :completed');
-    }
+    Object.entries(req.body).forEach(([key, value], index) => {
+      if (key === 'id' || key === 'createdAt') return;
+      const namePlaceholder = `#attr_${index}`;
+      const valuePlaceholder = `:val_${index}`;
+      expressionNames[namePlaceholder] = key;
+      expressionValues[valuePlaceholder] = (typeof value === 'string' && (key === 'text' || key === 'title'))
+        ? value.trim()
+        : value;
+      updates.push(`${namePlaceholder} = ${valuePlaceholder}`);
+    });
 
     const result = await dynamoDB.send(new UpdateCommand({
       TableName: TABLE_NAME,
@@ -117,6 +136,7 @@ app.put('/api/todos/:id', async (req, res) => {
   }
 });
 
+// 4. DELETE /api/todos/:id - Delete a todo from DynamoDB
 app.delete('/api/todos/:id', async (req, res) => {
   try {
     const result = await dynamoDB.send(new DeleteCommand({
@@ -139,6 +159,7 @@ app.delete('/api/todos/:id', async (req, res) => {
   }
 });
 
+// Start server
 if (require.main === module) {
   app.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
