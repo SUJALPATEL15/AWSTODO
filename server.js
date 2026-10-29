@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 const TABLE_NAME = 'TodoTable';
 const dynamoDB = DynamoDBDocumentClient.from(
-  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-south-1' })
+  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' })
 );
 
 app.use(express.json());
